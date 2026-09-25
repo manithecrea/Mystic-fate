@@ -1,0 +1,22 @@
+diff --git a/android/src/classic/java/io/invertase/googlemobileads/ReactNativeGoogleMobileAdsNativeModule.kt b/android/src/classic/java/io/invertase/googlemobileads/ReactNativeGoogleMobileAdsNativeModule.kt
+index 9c2a44519f016e3d2b535ba9e7673d0ce680f9b2..4c443815b44bb281cb3ae1ac371d619c51590b60 100644
+--- a/android/src/classic/java/io/invertase/googlemobileads/ReactNativeGoogleMobileAdsNativeModule.kt
++++ b/android/src/classic/java/io/invertase/googlemobileads/ReactNativeGoogleMobileAdsNativeModule.kt
+@@ -66,7 +66,7 @@ class ReactNativeGoogleMobileAdsNativeModule(
+               "Failed to get a valid response ID from the loaded ad.",
+               "load",
+             )
+-          promise.reject(error.getString("code"), error.getString("message"), error)
++          promise.reject(error.getString("code") ?: "", error.getString("message") ?: "", error)
+           return@loadAd
+         }
+         adHolders[responseId] = holder
+@@ -78,7 +78,7 @@ class ReactNativeGoogleMobileAdsNativeModule(
+         ReactNativeGoogleMobileAdsResponseInfo.toWritableMap(loadAdError.responseInfo)?.let {
+           error.putMap("responseInfo", it)
+         }
+-        promise.reject(error.getString("code"), error.getString("message"), error)
++        promise.reject(error.getString("code") ?: "", error.getString("message") ?: "", error)
+       },
+     )
+   }

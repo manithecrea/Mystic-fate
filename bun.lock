@@ -79,6 +79,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "react-native-google-mobile-ads@17.2.0": "patches/react-native-google-mobile-ads@17.2.0.patch",
+  },
   "overrides": {
     "@expo/prebuild-config": "latest",
   },
