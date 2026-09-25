@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GENDERS = ['Boy 💙', 'Girl 💖'];
+
+const LM_DATE_KEY = 'lastLoveMatchDate';
+const LM_USED_KEY = 'loveMatchesToday';
+const MAX_FREE_LM = 2;
 
 function calcCompatibility(a: string, b: string): number {
   const combined = (a + b).toLowerCase();
@@ -37,8 +41,35 @@ export default function LoveMatchScreen() {
   const [loyaltyPct] = useState(() => Math.floor(Math.random() * 40) + 30);
   const [showShare, setShowShare] = useState(false);
 
+  const [lmLeft, setLmLeft] = useState(MAX_FREE_LM);
+  const [lmPremium, setLmPremium] = useState(false);
+  const [showLmWall, setShowLmWall] = useState(false);
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const today = new Date().toDateString();
+        const savedDate = await AsyncStorage.getItem(LM_DATE_KEY);
+        const savedUsed = await AsyncStorage.getItem(LM_USED_KEY);
+        const premium = await AsyncStorage.getItem('isPremium');
+        if (savedDate !== today) {
+          await AsyncStorage.setItem(LM_DATE_KEY, today);
+          await AsyncStorage.setItem(LM_USED_KEY, '0');
+          setLmLeft(MAX_FREE_LM);
+        } else {
+          const used = parseInt(savedUsed || '0', 10);
+          setLmLeft(MAX_FREE_LM - used);
+        }
+        if (premium === 'true') setLmPremium(true);
+      } catch (e) {
+        console.log('[LoveMatch] Error loading limit state:', e);
+      }
+    };
+    load();
+  }, []);
 
   const triggerShake = () => {
     Animated.sequence([
@@ -69,7 +100,13 @@ export default function LoveMatchScreen() {
     }
   };
 
-  const handleCheck = () => {
+  const handleCheck = async () => {
+    if (!lmPremium && lmLeft <= 0) {
+      console.log('[LoveMatch] Out of checks');
+      setShowLmWall(true);
+      return;
+    }
+
     setShowShare(false);
     console.log('[LoveMatch] CHECK COMPATIBILITY pressed — yourName:', yourName, 'crushName:', crushName);
     if (!yourName.trim() || !crushName.trim()) {
@@ -78,6 +115,14 @@ export default function LoveMatchScreen() {
       return;
     }
     setError('');
+
+    if (!lmPremium) {
+      const newLeft = lmLeft - 1;
+      setLmLeft(newLeft);
+      const used = MAX_FREE_LM - newLeft;
+      await AsyncStorage.setItem(LM_USED_KEY, used.toString());
+    }
+
     setFinalPercent(null);
 
     const final = calcCompatibility(yourName.trim(), crushName.trim());
@@ -256,6 +301,19 @@ export default function LoveMatchScreen() {
           </Text>
         </TouchableOpacity>
 
+        {/* Reveals counter badge */}
+        <View style={{
+          backgroundColor: '#2a1e4a', borderRadius: 20,
+          paddingHorizontal: 12, paddingVertical: 6,
+          marginTop: 10, alignSelf: 'center',
+          borderWidth: 1,
+          borderColor: lmLeft <= 0 && !lmPremium ? '#facc15' : '#3a2a5a',
+        }}>
+          <Text style={{ color: lmLeft <= 0 && !lmPremium ? '#facc15' : '#9ca3af', fontSize: 11, fontWeight: '600' }}>
+            {lmPremium ? '∞ Unlimited · PREMIUM ✓' : `${lmLeft}/${MAX_FREE_LM} checks left today`}
+          </Text>
+        </View>
+
         {/* Result — NO box, NO background, pure floating text */}
         {showResult && percent !== null ? (
           <View style={{ backgroundColor: 'transparent', alignItems: 'center', marginTop: 20 }}>
@@ -311,6 +369,32 @@ export default function LoveMatchScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      {showLmWall && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: '#1a102e',
+          alignItems: 'center', justifyContent: 'center',
+          paddingHorizontal: 28,
+        }}>
+          <Text style={{ fontSize: 40, marginBottom: 16 }}>💔</Text>
+          <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: 8 }}>
+            No more checks today
+          </Text>
+          <Text style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', marginBottom: 32 }}>
+            {MAX_FREE_LM}/{MAX_FREE_LM} used · Come back tomorrow
+          </Text>
+          <TouchableOpacity
+            onPress={() => setShowLmWall(false)}
+            style={{ backgroundColor: '#facc15', borderRadius: 12, height: 52, width: '100%', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}
+          >
+            <Text style={{ color: '#000000', fontWeight: '800', fontSize: 14 }}>Unlock Unlimited 💛</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowLmWall(false)} style={{ paddingVertical: 8 }}>
+            <Text style={{ color: '#6b7280', fontSize: 13 }}>✕ Close</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }

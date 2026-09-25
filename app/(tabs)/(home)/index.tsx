@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,10 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const HISTORY_KEY = 'fortune_history';
+const REVEALS_DATE_KEY = 'lastRevealDate';
+const REVEALS_USED_KEY = 'revealsToday';
+const PREMIUM_KEY = 'isPremium';
+const MAX_FREE_REVEALS = 5;
 
 interface HistoryItem {
   id: string;
@@ -154,6 +158,11 @@ export default function HomeScreen() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState('Love');
 
+  // Scarcity state
+  const [revealsLeft, setRevealsLeft] = useState(MAX_FREE_REVEALS);
+  const [isPremium, setIsPremium] = useState(false);
+  const [showOutOfReveals, setShowOutOfReveals] = useState(false);
+
   // Reveal flow state
   const [isRevealing, setIsRevealing] = useState(false);
   const [showFortune, setShowFortune] = useState(false);
@@ -168,6 +177,37 @@ export default function HomeScreen() {
   const cardSlideAnim = useRef(new Animated.Value(60)).current;
   const cardOpacityAnim = useRef(new Animated.Value(0)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  // Load scarcity state on mount
+  useEffect(() => {
+    const loadState = async () => {
+      try {
+        const today = new Date().toDateString();
+        const savedDate = await AsyncStorage.getItem(REVEALS_DATE_KEY);
+        const savedReveals = await AsyncStorage.getItem(REVEALS_USED_KEY);
+        const premium = await AsyncStorage.getItem(PREMIUM_KEY);
+
+        if (savedDate !== today) {
+          await AsyncStorage.setItem(REVEALS_DATE_KEY, today);
+          await AsyncStorage.setItem(REVEALS_USED_KEY, '0');
+          setRevealsLeft(MAX_FREE_REVEALS);
+          console.log('[HomeScreen] New day — reveals reset to', MAX_FREE_REVEALS);
+        } else {
+          const used = parseInt(savedReveals || '0', 10);
+          setRevealsLeft(MAX_FREE_REVEALS - used);
+          console.log('[HomeScreen] Reveals used today:', used, '| left:', MAX_FREE_REVEALS - used);
+        }
+
+        if (premium === 'true') {
+          setIsPremium(true);
+          console.log('[HomeScreen] User is premium');
+        }
+      } catch (e) {
+        console.log('[HomeScreen] Error loading scarcity state:', e);
+      }
+    };
+    loadState();
+  }, []);
 
   const startBounce = () => {
     Animated.loop(
@@ -184,7 +224,14 @@ export default function HomeScreen() {
   };
 
   const handleReveal = useCallback(async () => {
-    console.log('[HomeScreen] Reveal My Fate pressed, category:', selectedCategory);
+    console.log('[HomeScreen] Reveal My Fate pressed, category:', selectedCategory, '| revealsLeft:', revealsLeft, '| isPremium:', isPremium);
+
+    // Scarcity gate
+    if (!isPremium && revealsLeft <= 0) {
+      console.log('[HomeScreen] Out of reveals — showing wall');
+      setShowOutOfReveals(true);
+      return;
+    }
 
     const fortunes = FORTUNES[selectedCategory] ?? FORTUNES['Love'];
     const randomIndex = Math.floor(Math.random() * fortunes.length);
@@ -192,7 +239,14 @@ export default function HomeScreen() {
     const lNum = Math.floor(Math.random() * 99) + 1;
     const lColor = LUCKY_COLORS[Math.floor(Math.random() * LUCKY_COLORS.length)];
 
-    console.log('[HomeScreen] Fortune selected:', fortune);
+    // Decrement reveals
+    if (!isPremium) {
+      const newLeft = revealsLeft - 1;
+      setRevealsLeft(newLeft);
+      const used = MAX_FREE_REVEALS - newLeft;
+      await AsyncStorage.setItem(REVEALS_USED_KEY, used.toString());
+      console.log('[HomeScreen] Reveal used — left:', newLeft);
+    }
 
     // Save to history
     const newItem: HistoryItem = {
@@ -219,20 +273,15 @@ export default function HomeScreen() {
     setIsRevealing(true);
     setLoadingText(LOADING_TEXTS[0]);
 
-    // Fade in overlay
     Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
-
-    // Start sparkle bounce
     startBounce();
 
-    // Cycle loading texts
     let i = 1;
     const textInterval = setInterval(() => {
       setLoadingText(LOADING_TEXTS[i % LOADING_TEXTS.length]);
       i++;
     }, 600);
 
-    // After 2.5s show result
     setTimeout(() => {
       clearInterval(textInterval);
       stopBounce();
@@ -243,7 +292,6 @@ export default function HomeScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
 
-      // Slide card up
       cardSlideAnim.setValue(60);
       cardOpacityAnim.setValue(0);
       Animated.parallel([
@@ -251,7 +299,7 @@ export default function HomeScreen() {
         Animated.timing(cardOpacityAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       ]).start();
     }, 2500);
-  }, [selectedCategory]);
+  }, [selectedCategory, revealsLeft, isPremium]);
 
   const handleClose = useCallback(() => {
     console.log('[HomeScreen] Fortune closed');
@@ -262,7 +310,6 @@ export default function HomeScreen() {
   }, []);
 
   const handleShare = useCallback(async () => {
-    console.log('[HomeScreen] Share Fortune pressed');
     try {
       await Share.share({ message: `🔮 My fortune: "${currentFortune}" — Lucky ${luckyNumber} | ${luckyColor}` });
     } catch (e) {
@@ -276,7 +323,18 @@ export default function HomeScreen() {
     setTimeout(() => handleReveal(), 300);
   }, [handleReveal, handleClose]);
 
+  // Watch ad: give +1 reveal (real ad integration later)
+  const handleWatchAd = useCallback(async () => {
+    console.log('[HomeScreen] Watch ad pressed — granting +1 reveal');
+    const newLeft = revealsLeft + 1;
+    setRevealsLeft(newLeft);
+    const used = MAX_FREE_REVEALS - newLeft;
+    await AsyncStorage.setItem(REVEALS_USED_KEY, Math.max(0, used).toString());
+    setShowOutOfReveals(false);
+  }, [revealsLeft]);
+
   const categoryBadgeText = currentCategory.toUpperCase();
+  const isOutOfReveals = !isPremium && revealsLeft <= 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
@@ -286,14 +344,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Main card */}
-        <View
-          style={{
-            backgroundColor: '#1a102e',
-            borderRadius: 24,
-            marginHorizontal: 16,
-            padding: 20,
-          }}
-        >
+        <View style={{ backgroundColor: '#1a102e', borderRadius: 24, marginHorizontal: 16, padding: 20 }}>
           {/* Top bar */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={{ fontSize: 10, fontWeight: '800', color: '#facc15', letterSpacing: 2, textTransform: 'uppercase' }}>
@@ -331,21 +382,13 @@ export default function HomeScreen() {
           </View>
 
           {/* Category pills */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ marginTop: 4 }}
-            contentContainerStyle={{ paddingRight: 8 }}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }} contentContainerStyle={{ paddingRight: 8 }}>
             {CATEGORIES.map((category) => {
               const isSelected = selectedCategory === category;
               return (
                 <TouchableOpacity
                   key={category}
-                  onPress={() => {
-                    console.log('[HomeScreen] Category selected:', category);
-                    setSelectedCategory(category);
-                  }}
+                  onPress={() => { console.log('[HomeScreen] Category selected:', category); setSelectedCategory(category); }}
                   style={{
                     borderWidth: 1,
                     borderColor: isSelected ? '#facc15' : '#2a2342',
@@ -367,12 +410,12 @@ export default function HomeScreen() {
             Pick a lane. The cards already know.
           </Text>
 
-          {/* CTA */}
+          {/* CTA button */}
           <TouchableOpacity
             onPress={handleReveal}
             disabled={isRevealing}
             style={{
-              backgroundColor: '#facc15',
+              backgroundColor: isOutOfReveals ? '#3a2a5a' : '#facc15',
               borderRadius: 12,
               height: 52,
               alignItems: 'center', justifyContent: 'center',
@@ -380,32 +423,44 @@ export default function HomeScreen() {
               opacity: isRevealing ? 0.7 : 1,
             }}
           >
-            <Text style={{ fontSize: 14, fontWeight: '800', color: '#000000', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-              {isRevealing ? 'READING YOUR FATE...' : 'REVEAL MY FATE'}
+            <Text style={{
+              fontSize: 14, fontWeight: '800',
+              color: isOutOfReveals ? '#6b7280' : '#000000',
+              letterSpacing: 1.5, textTransform: 'uppercase',
+            }}>
+              {isRevealing ? 'READING YOUR FATE...' : isOutOfReveals ? 'NO REVEALS LEFT' : 'REVEAL MY FATE'}
             </Text>
           </TouchableOpacity>
 
+          {/* Reveals counter badge */}
+          <View style={{
+            backgroundColor: '#2a1e4a',
+            borderRadius: 20,
+            paddingHorizontal: 12, paddingVertical: 6,
+            marginTop: 12,
+            alignSelf: 'center',
+            borderWidth: 1,
+            borderColor: revealsLeft <= 1 && !isPremium ? '#facc15' : '#3a2a5a',
+          }}>
+            <Text style={{
+              color: revealsLeft <= 1 && !isPremium ? '#facc15' : '#9ca3af',
+              fontSize: 11, fontWeight: '600',
+            }}>
+              {isPremium ? '∞ Unlimited · PREMIUM ✓' : `${revealsLeft}/${MAX_FREE_REVEALS} reveals left today`}
+            </Text>
+          </View>
+
           {/* Love Match secondary button */}
           <TouchableOpacity
-            onPress={() => {
-              console.log('[HomeScreen] Love Match button pressed');
-              router.push('/(tabs)/love-match');
-            }}
+            onPress={() => { console.log('[HomeScreen] Love Match button pressed'); router.push('/(tabs)/love-match'); }}
             style={{
-              borderWidth: 1,
-              borderColor: '#3a2a5a',
+              borderWidth: 1, borderColor: '#3a2a5a',
               backgroundColor: 'transparent',
-              borderRadius: 12,
-              height: 52,
-              width: '100%',
-              marginTop: 12,
-              alignItems: 'center',
-              justifyContent: 'center',
+              borderRadius: 12, height: 52, width: '100%',
+              marginTop: 12, alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <Text style={{ color: '#ffffff', fontWeight: '600', fontSize: 14 }}>
-              💘 Love Match
-            </Text>
+            <Text style={{ color: '#ffffff', fontWeight: '600', fontSize: 14 }}>💘 Love Match</Text>
           </TouchableOpacity>
 
           {/* Watch ad text */}
@@ -414,16 +469,8 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Love Match preview */}
-        <View
-          style={{
-            backgroundColor: '#1a102e',
-            borderRadius: 24,
-            padding: 20,
-            marginHorizontal: 16,
-            marginTop: 16,
-          }}
-        >
+        {/* Love Match preview card */}
+        <View style={{ backgroundColor: '#1a102e', borderRadius: 24, padding: 20, marginHorizontal: 16, marginTop: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ fontSize: 24 }}>💘</Text>
             <Text style={{ fontSize: 18, fontWeight: '700', color: '#ffffff', marginLeft: 8 }}>Love Match</Text>
@@ -432,6 +479,49 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
+      {/* Out of reveals wall */}
+      {showOutOfReveals && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: '#1a102e',
+          alignItems: 'center', justifyContent: 'center',
+          paddingHorizontal: 28,
+          paddingBottom: insets.bottom + 80,
+        }}>
+          <Text style={{ fontSize: 40, marginBottom: 16 }}>💔</Text>
+          <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: 8 }}>
+            You're out of fate for today
+          </Text>
+          <Text style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', marginBottom: 32 }}>
+            {MAX_FREE_REVEALS}/{MAX_FREE_REVEALS} used · Come back tomorrow
+          </Text>
+
+          {/* Unlock premium */}
+          <TouchableOpacity
+            onPress={() => { console.log('[HomeScreen] Unlock Unlimited pressed'); setShowOutOfReveals(false); }}
+            style={{ backgroundColor: '#facc15', borderRadius: 12, height: 52, width: '100%', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}
+          >
+            <Text style={{ color: '#000000', fontWeight: '800', fontSize: 14, letterSpacing: 1 }}>
+              Unlock Unlimited 💛
+            </Text>
+          </TouchableOpacity>
+
+          {/* Watch ad for +1 */}
+          <TouchableOpacity
+            onPress={handleWatchAd}
+            style={{ borderWidth: 1, borderColor: '#4a3a6a', borderRadius: 12, height: 52, width: '100%', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
+              Watch ad for +1 more 🎬
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setShowOutOfReveals(false)} style={{ paddingVertical: 8 }}>
+            <Text style={{ color: '#6b7280', fontSize: 13 }}>✕ Close</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Full-screen overlay for loading + result */}
       {(isRevealing || showFortune) && (
         <Animated.View
@@ -439,8 +529,7 @@ export default function HomeScreen() {
             position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: '#1a102e',
             opacity: overlayOpacity,
-            alignItems: 'center',
-            justifyContent: 'center',
+            alignItems: 'center', justifyContent: 'center',
             paddingHorizontal: 24,
             paddingBottom: insets.bottom + 80,
           }}
@@ -448,25 +537,10 @@ export default function HomeScreen() {
           {/* STEP 1: Loading */}
           {isRevealing && (
             <View style={{ alignItems: 'center' }}>
-              <Animated.Text
-                style={{
-                  fontSize: 48,
-                  transform: [{ scale: bounceAnim }],
-                  marginBottom: 28,
-                }}
-              >
+              <Animated.Text style={{ fontSize: 48, transform: [{ scale: bounceAnim }], marginBottom: 28 }}>
                 ✨
               </Animated.Text>
-              <Text
-                style={{
-                  color: '#ffffff',
-                  fontSize: 18,
-                  fontWeight: '700',
-                  textAlign: 'center',
-                  lineHeight: 26,
-                  paddingHorizontal: 16,
-                }}
-              >
+              <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '700', textAlign: 'center', lineHeight: 26, paddingHorizontal: 16 }}>
                 {loadingText}
               </Text>
             </View>
@@ -474,103 +548,39 @@ export default function HomeScreen() {
 
           {/* STEP 2: Fortune result */}
           {showFortune && (
-            <Animated.View
-              style={{
-                width: '100%',
-                opacity: cardOpacityAnim,
-                transform: [{ translateY: cardSlideAnim }],
-              }}
-            >
-              {/* Fortune card */}
-              <View
-                style={{
-                  backgroundColor: '#2a1a4a',
-                  borderRadius: 16,
-                  padding: 20,
-                  marginBottom: 16,
-                }}
-              >
-                {/* Category label */}
-                <Text
-                  style={{
-                    color: '#a78bfa',
-                    fontSize: 10,
-                    fontWeight: '700',
-                    textTransform: 'uppercase',
-                    letterSpacing: 1.5,
-                    marginBottom: 12,
-                  }}
-                >
+            <Animated.View style={{ width: '100%', opacity: cardOpacityAnim, transform: [{ translateY: cardSlideAnim }] }}>
+              <View style={{ backgroundColor: '#2a1a4a', borderRadius: 16, padding: 20, marginBottom: 16 }}>
+                <Text style={{ color: '#a78bfa', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 }}>
                   {categoryBadgeText}
                 </Text>
-
-                {/* Fortune text */}
-                <Text
-                  style={{
-                    color: '#ffffff',
-                    fontSize: 20,
-                    fontWeight: '700',
-                    lineHeight: 28,
-                    marginBottom: 16,
-                  }}
-                >
+                <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '700', lineHeight: 28, marginBottom: 16 }}>
                   {currentFortune}
                 </Text>
-
-                {/* Lucky row */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: '#facc15', fontSize: 12, fontWeight: '700' }}>
-                    Lucky {luckyNumber}
-                  </Text>
-                  <Text style={{ color: '#facc15', fontSize: 12, fontWeight: '700' }}>
-                    {luckyColor}
-                  </Text>
+                  <Text style={{ color: '#facc15', fontSize: 12, fontWeight: '700' }}>Lucky {luckyNumber}</Text>
+                  <Text style={{ color: '#facc15', fontSize: 12, fontWeight: '700' }}>{luckyColor}</Text>
                 </View>
               </View>
 
-              {/* Countdown hint */}
               <Text style={{ color: '#6b7280', fontSize: 11, textAlign: 'center', marginBottom: 20 }}>
                 ✦ The cards have spoken ✦
               </Text>
 
-              {/* Share button */}
               <TouchableOpacity
                 onPress={handleShare}
-                style={{
-                  backgroundColor: '#facc15',
-                  borderRadius: 12,
-                  height: 48,
-                  alignItems: 'center', justifyContent: 'center',
-                  marginBottom: 10,
-                }}
+                style={{ backgroundColor: '#facc15', borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}
               >
-                <Text style={{ color: '#000000', fontWeight: '800', fontSize: 13, letterSpacing: 1 }}>
-                  SHARE FORTUNE
-                </Text>
+                <Text style={{ color: '#000000', fontWeight: '800', fontSize: 13, letterSpacing: 1 }}>SHARE FORTUNE</Text>
               </TouchableOpacity>
 
-              {/* Shake Again */}
               <TouchableOpacity
                 onPress={handleShakeAgain}
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#4a3a6a',
-                  borderRadius: 12,
-                  height: 48,
-                  alignItems: 'center', justifyContent: 'center',
-                  marginBottom: 10,
-                }}
+                style={{ borderWidth: 1, borderColor: '#4a3a6a', borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}
               >
-                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
-                  SHAKE AGAIN
-                </Text>
+                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>SHAKE AGAIN</Text>
               </TouchableOpacity>
 
-              {/* Close X */}
-              <TouchableOpacity
-                onPress={handleClose}
-                style={{ alignItems: 'center', marginTop: 4, paddingVertical: 8 }}
-              >
+              <TouchableOpacity onPress={handleClose} style={{ alignItems: 'center', marginTop: 4, paddingVertical: 8 }}>
                 <Text style={{ color: '#6b7280', fontSize: 13 }}>✕ Close</Text>
               </TouchableOpacity>
             </Animated.View>
