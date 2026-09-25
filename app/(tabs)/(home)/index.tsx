@@ -8,6 +8,7 @@ import {
   Platform,
   Share,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -150,6 +151,7 @@ const CATEGORIES = ['Love', 'Money', 'Future', 'Yes / No', 'Ex'];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState('Love');
 
   // Reveal flow state
@@ -382,6 +384,34 @@ export default function HomeScreen() {
               {isRevealing ? 'READING YOUR FATE...' : 'REVEAL MY FATE'}
             </Text>
           </TouchableOpacity>
+
+          {/* Love Match secondary button */}
+          <TouchableOpacity
+            onPress={() => {
+              console.log('[HomeScreen] Love Match button pressed');
+              router.push('/(tabs)/love-match');
+            }}
+            style={{
+              borderWidth: 1,
+              borderColor: '#3a2a5a',
+              backgroundColor: 'transparent',
+              borderRadius: 12,
+              height: 52,
+              width: '100%',
+              marginTop: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '600', fontSize: 14 }}>
+              💘 Love Match
+            </Text>
+          </TouchableOpacity>
+
+          {/* Watch ad text */}
+          <Text style={{ color: '#facc15', fontSize: 12, textAlign: 'center', marginTop: 10 }}>
+            Watch an ad for 5 more
+          </Text>
         </View>
 
         {/* Love Match preview */}
