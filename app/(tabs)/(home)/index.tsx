@@ -7,8 +7,10 @@ import {
   Animated,
   Platform,
   Share,
+  Alert,
   ActivityIndicator,
 } from 'react-native';
+import * as InAppPurchases from 'expo-in-app-purchases';
 import { loadAndShowRewardedAd } from '@/utils/admob';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +22,7 @@ const REVEALS_DATE_KEY = 'lastRevealDate';
 const REVEALS_USED_KEY = 'revealsToday';
 const PREMIUM_KEY = 'isPremium';
 const MAX_FREE_REVEALS = 5;
+const IAP_PRODUCT_ID = 'com.lovematch.fortune.premium_unlimited';
 
 interface HistoryItem {
   id: string;
@@ -350,6 +353,43 @@ export default function HomeScreen() {
     }
   }, [revealsLeft]);
 
+  const handleUnlockPremium = useCallback(async () => {
+    console.log('[HomeScreen] Unlock Unlimited pressed — initiating IAP');
+    try {
+      await InAppPurchases.connectAsync();
+      const { responseCode, results } = await InAppPurchases.getProductsAsync([IAP_PRODUCT_ID]);
+      if (responseCode !== InAppPurchases.IAPResponseCode.OK || !results?.length) {
+        Alert.alert('Not Available', 'Premium upgrade is not available right now. Please try again later.');
+        return;
+      }
+      InAppPurchases.setPurchaseListener(async ({ responseCode: rc, results: purchases, errorCode }) => {
+        if (rc === InAppPurchases.IAPResponseCode.OK && purchases?.length) {
+          for (const purchase of purchases) {
+            if (!purchase.acknowledged) {
+              await InAppPurchases.finishTransactionAsync(purchase, true);
+            }
+          }
+          await AsyncStorage.setItem(PREMIUM_KEY, 'true');
+          setIsPremium(true);
+          setShowOutOfReveals(false);
+          console.log('[HomeScreen] IAP purchase complete — premium unlocked');
+          Alert.alert('✨ Premium Unlocked!', 'You now have unlimited reveals. Enjoy!');
+        } else if (rc === InAppPurchases.IAPResponseCode.USER_CANCELED) {
+          console.log('[HomeScreen] IAP cancelled by user');
+        } else {
+          console.log('[HomeScreen] IAP error code:', errorCode);
+          Alert.alert('Purchase Failed', 'Something went wrong. Please try again.');
+        }
+        try { await InAppPurchases.disconnectAsync(); } catch (_) {}
+      });
+      await InAppPurchases.purchaseItemAsync(IAP_PRODUCT_ID);
+    } catch (e) {
+      console.log('[HomeScreen] IAP exception:', e);
+      Alert.alert('Purchase Unavailable', 'In-app purchases are not available on this device.');
+      try { await InAppPurchases.disconnectAsync(); } catch (_) {}
+    }
+  }, []);
+
   const categoryBadgeText = currentCategory.toUpperCase();
   const isOutOfReveals = !isPremium && revealsLeft <= 0;
 
@@ -526,7 +566,7 @@ export default function HomeScreen() {
 
           {/* Unlock premium */}
           <TouchableOpacity
-            onPress={() => { console.log('[HomeScreen] Unlock Unlimited pressed'); setShowOutOfReveals(false); }}
+            onPress={handleUnlockPremium}
             style={{ backgroundColor: '#facc15', borderRadius: 12, height: 52, width: '100%', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}
           >
             <Text style={{ color: '#000000', fontWeight: '800', fontSize: 14, letterSpacing: 1 }}>
