@@ -4,9 +4,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Modal,
   Animated,
-  Alert,
   ScrollView,
   Vibration,
 } from 'react-native';
@@ -69,7 +67,13 @@ export default function LoveMatchScreen() {
   const [selectedGender, setSelectedGender] = useState('Girl 💖');
   const [yourName, setYourName] = useState('');
   const [crushName, setCrushName] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
+  const [error, setError] = useState('');
+
+  // Animation / result state
+  const [displayPercent, setDisplayPercent] = useState<number | null>(null);
+  const [isRandomizing, setIsRandomizing] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [calcPhrase, setCalcPhrase] = useState('');
   const [result, setResult] = useState<{
     pct: number;
     luckyNum: number;
@@ -77,16 +81,12 @@ export default function LoveMatchScreen() {
     reading: string;
     status: string;
   } | null>(null);
-  const [error, setError] = useState('');
-  const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  const [displayPercent, setDisplayPercent] = useState(0);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [showResult, setShowResult] = useState(false);
-  const [calcPhrase, setCalcPhrase] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phraseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const shakeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const resultFadeAnim = useRef(new Animated.Value(0)).current;
 
   const triggerShake = () => {
     Animated.sequence([
@@ -117,91 +117,81 @@ export default function LoveMatchScreen() {
   };
 
   const handleCheck = () => {
-    console.log('[LoveMatch] CHECK COMPATIBILITY pressed — yourName:', yourName, 'crushName:', crushName, 'gender:', selectedGender);
+    console.log('[LoveMatch] CHECK COMPATIBILITY pressed');
     if (!yourName.trim() || !crushName.trim()) {
-      console.log('[LoveMatch] Validation failed — empty name(s)');
       triggerShake();
       setError('Enter both names');
       return;
     }
     setError('');
+    setShowResult(false);
+    setResult(null);
+    resultFadeAnim.setValue(0);
 
-    // Pre-calculate result
+    // Pre-calculate
     const pct = calcCompatibility(yourName.trim(), crushName.trim());
     const luckyNum = Math.floor(Math.random() * 99) + 1;
     const luckyColor = LUCKY_COLORS[Math.floor(Math.random() * LUCKY_COLORS.length)];
     const reading = LOVE_READINGS[Math.floor(Math.random() * LOVE_READINGS.length)];
     const status = getStatus(pct);
-    console.log('[LoveMatch] Result calculated — pct:', pct, 'luckyNum:', luckyNum, 'luckyColor:', luckyColor, 'status:', status);
 
-    // Open modal in calculating state
-    setIsCalculating(true);
-    setShowResult(false);
+    // Start randomizing
+    setIsRandomizing(true);
     setDisplayPercent(Math.floor(Math.random() * 100) + 1);
-    setModalVisible(true);
     setCalcPhrase(CALC_PHRASES[0]);
 
-    // Phrase cycling every 500ms
+    // Cycle phrases
     let phraseIdx = 0;
     phraseIntervalRef.current = setInterval(() => {
       phraseIdx = (phraseIdx + 1) % CALC_PHRASES.length;
       setCalcPhrase(CALC_PHRASES[phraseIdx]);
     }, 500);
 
-    // Number flipping every 70ms for ~2.5s (35 ticks)
-    let count = 0;
+    // Flip numbers
+    let ticks = 0;
     intervalRef.current = setInterval(() => {
       setDisplayPercent(Math.floor(Math.random() * 100) + 1);
-      count++;
-      if (count >= 35) {
-        // Stop both intervals
+      ticks++;
+      if (ticks >= 30) {
         if (intervalRef.current) clearInterval(intervalRef.current);
         if (phraseIntervalRef.current) clearInterval(phraseIntervalRef.current);
 
-        // Land on final score
         setDisplayPercent(pct);
-        setIsCalculating(false);
+        setIsRandomizing(false);
 
-        // Pop scale animation
+        // Pop animation on number
         scaleAnim.setValue(0.5);
         Animated.sequence([
-          Animated.timing(scaleAnim, { toValue: 1.2, duration: 150, useNativeDriver: true }),
+          Animated.timing(scaleAnim, { toValue: 1.25, duration: 150, useNativeDriver: true }),
           Animated.timing(scaleAnim, { toValue: 1.0, duration: 100, useNativeDriver: true }),
         ]).start();
 
-        // Haptic
         Vibration.vibrate(50);
 
-        // Show full result
+        // Fade in result card
         setResult({ pct, luckyNum, luckyColor, reading, status });
         setShowResult(true);
+        Animated.timing(resultFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+
         saveToHistory(pct, luckyNum);
       }
-    }, 70);
+    }, 80);
   };
 
-  const handleTryAgain = () => {
-    console.log('[LoveMatch] TRY AGAIN pressed');
+  const handleReset = () => {
+    console.log('[LoveMatch] Reset pressed');
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (phraseIntervalRef.current) clearInterval(phraseIntervalRef.current);
-    setModalVisible(false);
-    setIsCalculating(false);
+    setIsRandomizing(false);
     setShowResult(false);
-    setDisplayPercent(0);
+    setDisplayPercent(null);
+    setResult(null);
     setYourName('');
     setCrushName('');
     setError('');
   };
 
-  const handleShare = () => {
-    console.log('[LoveMatch] SHARE RESULT pressed');
-    Alert.alert('Sharing coming soon!');
-  };
-
-  const handleGenderSelect = (gender: string) => {
-    console.log('[LoveMatch] Gender selected:', gender);
-    setSelectedGender(gender);
-  };
+  const isRunning = isRandomizing;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#1a102e' }}>
@@ -209,7 +199,7 @@ export default function LoveMatchScreen() {
         contentContainerStyle={{
           padding: 20,
           paddingTop: insets.top + 20,
-          paddingBottom: 100,
+          paddingBottom: 120,
           gap: 14,
         }}
         showsVerticalScrollIndicator={false}
@@ -236,7 +226,11 @@ export default function LoveMatchScreen() {
               return (
                 <TouchableOpacity
                   key={gender}
-                  onPress={() => handleGenderSelect(gender)}
+                  onPress={() => {
+                    console.log('[LoveMatch] Gender selected:', gender);
+                    setSelectedGender(gender);
+                  }}
+                  disabled={isRunning}
                   style={{
                     flex: 1,
                     height: 38,
@@ -246,15 +240,10 @@ export default function LoveMatchScreen() {
                     justifyContent: 'center',
                     backgroundColor: isActive ? '#facc15' : 'transparent',
                     borderColor: isActive ? '#facc15' : '#2a2342',
+                    opacity: isRunning ? 0.5 : 1,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: isActive ? '#000000' : '#9ca3af',
-                      fontWeight: isActive ? '700' : '400',
-                    }}
-                  >
+                  <Text style={{ fontSize: 12, color: isActive ? '#000000' : '#9ca3af', fontWeight: isActive ? '700' : '400' }}>
                     {gender}
                   </Text>
                 </TouchableOpacity>
@@ -263,7 +252,7 @@ export default function LoveMatchScreen() {
           </View>
         </View>
 
-        {/* Your name input */}
+        {/* Your name */}
         <View>
           <Text style={{ color: '#facc15', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>
             Your name
@@ -271,12 +260,10 @@ export default function LoveMatchScreen() {
           <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
             <TextInput
               value={yourName}
-              onChangeText={(text) => {
-                setYourName(text);
-                if (error) setError('');
-              }}
+              onChangeText={(t) => { setYourName(t); if (error) setError(''); }}
               placeholder="Your name"
               placeholderTextColor="#6b7280"
+              editable={!isRunning}
               style={{
                 backgroundColor: '#2a1e4a',
                 borderRadius: 12,
@@ -284,12 +271,13 @@ export default function LoveMatchScreen() {
                 paddingHorizontal: 16,
                 color: '#ffffff',
                 fontSize: 13,
+                opacity: isRunning ? 0.5 : 1,
               }}
             />
           </Animated.View>
         </View>
 
-        {/* Crush name input */}
+        {/* Crush name */}
         <View>
           <Text style={{ color: '#facc15', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>
             Crush name
@@ -297,12 +285,10 @@ export default function LoveMatchScreen() {
           <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
             <TextInput
               value={crushName}
-              onChangeText={(text) => {
-                setCrushName(text);
-                if (error) setError('');
-              }}
+              onChangeText={(t) => { setCrushName(t); if (error) setError(''); }}
               placeholder="Their name"
               placeholderTextColor="#6b7280"
+              editable={!isRunning}
               style={{
                 backgroundColor: '#2a1e4a',
                 borderRadius: 12,
@@ -310,23 +296,23 @@ export default function LoveMatchScreen() {
                 paddingHorizontal: 16,
                 color: '#ffffff',
                 fontSize: 13,
+                opacity: isRunning ? 0.5 : 1,
               }}
             />
           </Animated.View>
         </View>
 
-        {/* Error text */}
+        {/* Error */}
         {error ? (
-          <Text style={{ color: '#ef4444', fontSize: 11, marginTop: -8 }}>
-            {error}
-          </Text>
+          <Text style={{ color: '#ef4444', fontSize: 11, marginTop: -8 }}>{error}</Text>
         ) : null}
 
         {/* CTA Button */}
         <TouchableOpacity
           onPress={handleCheck}
+          disabled={isRunning}
           style={{
-            backgroundColor: '#facc15',
+            backgroundColor: isRunning ? '#7a6a00' : '#facc15',
             height: 50,
             borderRadius: 12,
             alignItems: 'center',
@@ -334,54 +320,25 @@ export default function LoveMatchScreen() {
             marginTop: 8,
           }}
         >
-          <Text
-            style={{
-              color: '#000000',
-              fontWeight: '800',
-              fontSize: 12,
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-            }}
-          >
-            CHECK COMPATIBILITY 💖
+          <Text style={{ color: '#000000', fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+            {isRunning ? 'CALCULATING...' : 'CHECK COMPATIBILITY 💖'}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
 
-      {/* Compatibility Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          if (phraseIntervalRef.current) clearInterval(phraseIntervalRef.current);
-          setModalVisible(false);
-          setIsCalculating(false);
-          setShowResult(false);
-        }}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' }}>
+        {/* Number display box — shown while randomizing OR after result */}
+        {displayPercent !== null ? (
           <View
             style={{
-              backgroundColor: '#241a3d',
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              padding: 28,
-              paddingBottom: 40 + insets.bottom,
+              backgroundColor: '#2a1e4a',
+              borderRadius: 16,
+              height: 120,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 4,
             }}
           >
-            {/* Drag handle */}
-            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-              <View style={{ width: 40, height: 4, backgroundColor: '#2a2342', borderRadius: 2 }} />
-            </View>
-
-            {isCalculating ? (
-              /* CALCULATING PHASE */
-              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600', marginBottom: 24 }}>
-                  Calculating chemistry... 💘
-                </Text>
+            {isRandomizing ? (
+              <>
                 <Text style={{
                   color: '#facc15',
                   fontSize: 64,
@@ -389,78 +346,90 @@ export default function LoveMatchScreen() {
                   textAlign: 'center',
                   shadowColor: '#facc15',
                   shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.8,
-                  shadowRadius: 20,
+                  shadowOpacity: 0.9,
+                  shadowRadius: 16,
                 }}>
                   {displayPercent}
                 </Text>
-                <Text style={{ color: '#9ca3af', fontSize: 13, marginTop: 16, textAlign: 'center' }}>
-                  {calcPhrase}
-                </Text>
-              </View>
-            ) : showResult && result ? (
-              /* RESULT PHASE */
-              <>
-                {/* Percentage with scale animation */}
-                <Animated.Text style={{
-                  color: '#facc15',
-                  fontSize: 48,
-                  fontWeight: '800',
-                  textAlign: 'center',
-                  transform: [{ scale: scaleAnim }],
-                }}>
-                  {`${result.pct}%`}
-                </Animated.Text>
-
-                {/* Status */}
-                <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600', textAlign: 'center', marginTop: 8 }}>
-                  {result.status}
-                </Text>
-
-                {/* Reading */}
-                <Text style={{ color: '#9ca3af', fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 20 }}>
-                  {result.reading}
-                </Text>
-
-                {/* Lucky row */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 }}>
-                  <View>
-                    <Text style={{ color: '#9ca3af', fontSize: 11 }}>Lucky Number</Text>
-                    <Text style={{ color: '#facc15', fontSize: 18, fontWeight: '700', marginTop: 2 }}>{result.luckyNum}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ color: '#9ca3af', fontSize: 11 }}>Lucky Color</Text>
-                    <Text style={{ color: '#facc15', fontSize: 18, fontWeight: '700', marginTop: 2 }}>{result.luckyColor}</Text>
-                  </View>
-                </View>
-
-                {/* Divider */}
-                <View style={{ height: 1, backgroundColor: '#2a2342', marginVertical: 20 }} />
-
-                {/* Buttons */}
-                <View style={{ gap: 10 }}>
-                  <TouchableOpacity
-                    onPress={handleShare}
-                    style={{ backgroundColor: '#facc15', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Text style={{ color: '#000000', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                      SHARE RESULT 💫
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleTryAgain}
-                    style={{ backgroundColor: 'transparent', borderWidth: 1, borderColor: '#2a2342', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Text style={{ color: '#ffffff', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                      TRY AGAIN
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={{ color: '#9ca3af', fontSize: 12, marginTop: 4 }}>{calcPhrase}</Text>
               </>
-            ) : null}
+            ) : (
+              <Animated.Text style={{
+                color: '#facc15',
+                fontSize: 64,
+                fontWeight: '800',
+                textAlign: 'center',
+                transform: [{ scale: scaleAnim }],
+                shadowColor: '#facc15',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.9,
+                shadowRadius: 16,
+              }}>
+                {`${displayPercent}%`}
+              </Animated.Text>
+            )}
           </View>
-        </View>
-      </Modal>
+        ) : null}
+
+        {/* Inline result card — fades in after animation */}
+        {showResult && result ? (
+          <Animated.View
+            style={{
+              opacity: resultFadeAnim,
+              backgroundColor: '#241a3d',
+              borderRadius: 16,
+              padding: 20,
+              gap: 8,
+            }}
+          >
+            {/* Status */}
+            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', textAlign: 'center' }}>
+              {result.pct}% Compatible
+            </Text>
+            <Text style={{ color: '#a78bfa', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+              {result.status}
+            </Text>
+
+            {/* Reading */}
+            <Text style={{ color: '#9ca3af', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 4 }}>
+              {result.reading}
+            </Text>
+
+            {/* Lucky row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+              <View>
+                <Text style={{ color: '#6b7280', fontSize: 10 }}>Lucky Number</Text>
+                <Text style={{ color: '#facc15', fontSize: 16, fontWeight: '700', marginTop: 2 }}>{result.luckyNum}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ color: '#6b7280', fontSize: 10 }}>Lucky Color</Text>
+                <Text style={{ color: '#facc15', fontSize: 16, fontWeight: '700', marginTop: 2 }}>{result.luckyColor}</Text>
+              </View>
+            </View>
+
+            {/* Divider */}
+            <View style={{ height: 1, backgroundColor: '#2a2342', marginVertical: 8 }} />
+
+            {/* Try Again button */}
+            <TouchableOpacity
+              onPress={handleReset}
+              style={{
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderColor: '#2a2342',
+                height: 44,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+                TRY AGAIN
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
