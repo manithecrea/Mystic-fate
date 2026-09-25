@@ -7,7 +7,9 @@ import {
   Animated,
   Platform,
   Share,
+  ActivityIndicator,
 } from 'react-native';
+import { loadAndShowRewardedAd } from '@/utils/admob';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -323,14 +325,29 @@ export default function HomeScreen() {
     setTimeout(() => handleReveal(), 300);
   }, [handleReveal, handleClose]);
 
-  // Watch ad: give +1 reveal (real ad integration later)
+  const [isLoadingAd, setIsLoadingAd] = useState(false);
+
+  // Watch ad: real AdMob rewarded ad
   const handleWatchAd = useCallback(async () => {
-    console.log('[HomeScreen] Watch ad pressed — granting +1 reveal');
-    const newLeft = revealsLeft + 1;
-    setRevealsLeft(newLeft);
-    const used = MAX_FREE_REVEALS - newLeft;
-    await AsyncStorage.setItem(REVEALS_USED_KEY, Math.max(0, used).toString());
-    setShowOutOfReveals(false);
+    console.log('[HomeScreen] Watch ad pressed — loading rewarded ad');
+    setIsLoadingAd(true);
+    try {
+      const rewarded = await loadAndShowRewardedAd();
+      if (rewarded) {
+        console.log('[HomeScreen] Ad reward earned — granting +1 reveal');
+        const newLeft = revealsLeft + 1;
+        setRevealsLeft(newLeft);
+        const used = Math.max(0, MAX_FREE_REVEALS - newLeft);
+        await AsyncStorage.setItem(REVEALS_USED_KEY, used.toString());
+        setShowOutOfReveals(false);
+      } else {
+        console.log('[HomeScreen] Ad closed without reward — no reveal granted');
+      }
+    } catch (e) {
+      console.log('[HomeScreen] Ad failed:', e);
+    } finally {
+      setIsLoadingAd(false);
+    }
   }, [revealsLeft]);
 
   const categoryBadgeText = currentCategory.toUpperCase();
@@ -464,9 +481,20 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           {/* Watch ad text */}
-          <Text style={{ color: '#facc15', fontSize: 12, textAlign: 'center', marginTop: 10 }}>
-            Watch an ad for 5 more
-          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              console.log('[HomeScreen] Watch an ad for 5 more pressed');
+              if (!isPremium && revealsLeft <= 0) {
+                handleWatchAd();
+              } else {
+                setShowOutOfReveals(true);
+              }
+            }}
+          >
+            <Text style={{ color: '#facc15', fontSize: 12, textAlign: 'center', marginTop: 10 }}>
+              Watch an ad for 5 more
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Love Match preview card */}
@@ -509,11 +537,16 @@ export default function HomeScreen() {
           {/* Watch ad for +1 */}
           <TouchableOpacity
             onPress={handleWatchAd}
+            disabled={isLoadingAd}
             style={{ borderWidth: 1, borderColor: '#4a3a6a', borderRadius: 12, height: 52, width: '100%', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
           >
-            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
-              Watch ad for +1 more 🎬
-            </Text>
+            {isLoadingAd ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
+                Watch ad for +1 more 🎬
+              </Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setShowOutOfReveals(false)} style={{ paddingVertical: 8 }}>

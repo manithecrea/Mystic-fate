@@ -33,7 +33,13 @@
       "expo-font",
       "expo-router",
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9415637801845502~6749402790"
+        }
+      ]
     ],
     "scheme": "mysticfate",
     "experiments": {
