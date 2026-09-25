@@ -11,38 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const LOVE_READINGS = [
-  "Your soulmate's name starts with J... or maybe it's your ex you can't forget.",
-  "They will text you at 2:13am but it's not love — their phone died and you are their charger.",
-  "You two have big energy. One of you will catch feelings first. It's already too late.",
-  "The stars say yes. Your anxiety says maybe. Your heart already knows.",
-  "This connection has past life energy. You've argued before — in ancient Rome.",
-  "One of you is already in too deep. The other is still 'just vibing'.",
-  "The chemistry is real. The timing? Absolutely chaotic.",
-  "You will share a playlist. Then feelings. Then regret. Then more feelings.",
-  "They think about you more than they admit. Especially at 3am.",
-  "This match has main character energy. Someone's getting a confession soon.",
-  "The universe ships you. Hard. But it also loves drama.",
-  "You two would either build an empire or burn one down together.",
-  "High compatibility detected. Proceed with butterflies and mild panic.",
-  "The cards see late night talks, inside jokes, and one very awkward moment.",
-  "Destiny brought you here. Free will decides what happens next.",
-];
-
-const LUCKY_COLORS = ['Rose Gold', 'Midnight Blue', 'Lavender', 'Crimson', 'Gold', 'Violet', 'Coral', 'Emerald'];
-
 const GENDERS = ['Boy 💙', 'Girl 💖', 'Non-binary ✨'];
-
-const CALC_PHRASES = [
-  'Scanning energy...',
-  'Checking if they like you back...',
-  'Asking the cards...',
-  'Reading the stars...',
-  'Analyzing texts...',
-  'Checking star signs...',
-  'Exposing chemistry...',
-  'Consulting the universe...',
-];
 
 function calcCompatibility(a: string, b: string): number {
   const combined = (a + b).toLowerCase();
@@ -53,14 +22,6 @@ function calcCompatibility(a: string, b: string): number {
   return (sum % 40) + 60;
 }
 
-function getStatus(pct: number): string {
-  if (pct >= 90) return "Soulmates... or trauma bonded?";
-  if (pct >= 80) return "Big energy. One of you will catch feelings first.";
-  if (pct >= 70) return "Chaotic but magnetic. Proceed with caution.";
-  if (pct >= 65) return "It's complicated. The cards are sweating.";
-  return "The universe is... thinking about it.";
-}
-
 export default function LoveMatchScreen() {
   const insets = useSafeAreaInsets();
 
@@ -69,24 +30,13 @@ export default function LoveMatchScreen() {
   const [crushName, setCrushName] = useState('');
   const [error, setError] = useState('');
 
-  // Animation / result state
-  const [displayPercent, setDisplayPercent] = useState<number | null>(null);
+  const [percent, setPercent] = useState<number | null>(null);
+  const [finalPercent, setFinalPercent] = useState<number | null>(null);
   const [isRandomizing, setIsRandomizing] = useState(false);
-  const [showResult, setShowResult] = useState(false);
-  const [calcPhrase, setCalcPhrase] = useState('');
-  const [result, setResult] = useState<{
-    pct: number;
-    luckyNum: number;
-    luckyColor: string;
-    reading: string;
-    status: string;
-  } | null>(null);
+  const [loyaltyPct] = useState(() => Math.floor(Math.random() * 40) + 30);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const phraseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shakeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const resultFadeAnim = useRef(new Animated.Value(0)).current;
 
   const triggerShake = () => {
     Animated.sequence([
@@ -98,8 +48,9 @@ export default function LoveMatchScreen() {
     ]).start();
   };
 
-  const saveToHistory = async (pct: number, luckyNum: number) => {
+  const saveToHistory = async (pct: number) => {
     try {
+      const luckyNum = Math.floor(Math.random() * 99) + 1;
       const item = {
         id: Date.now().toString(),
         fortune: `${yourName.trim()} + ${crushName.trim()} = ${pct}% compatible`,
@@ -117,81 +68,38 @@ export default function LoveMatchScreen() {
   };
 
   const handleCheck = () => {
-    console.log('[LoveMatch] CHECK COMPATIBILITY pressed');
+    console.log('[LoveMatch] CHECK COMPATIBILITY pressed — yourName:', yourName, 'crushName:', crushName);
     if (!yourName.trim() || !crushName.trim()) {
       triggerShake();
       setError('Enter both names');
       return;
     }
     setError('');
-    setShowResult(false);
-    setResult(null);
-    resultFadeAnim.setValue(0);
+    setFinalPercent(null);
 
-    // Pre-calculate
-    const pct = calcCompatibility(yourName.trim(), crushName.trim());
-    const luckyNum = Math.floor(Math.random() * 99) + 1;
-    const luckyColor = LUCKY_COLORS[Math.floor(Math.random() * LUCKY_COLORS.length)];
-    const reading = LOVE_READINGS[Math.floor(Math.random() * LOVE_READINGS.length)];
-    const status = getStatus(pct);
-
-    // Start randomizing
+    const final = calcCompatibility(yourName.trim(), crushName.trim());
     setIsRandomizing(true);
-    setDisplayPercent(Math.floor(Math.random() * 100) + 1);
-    setCalcPhrase(CALC_PHRASES[0]);
+    setPercent(Math.floor(Math.random() * 100) + 1);
 
-    // Cycle phrases
-    let phraseIdx = 0;
-    phraseIntervalRef.current = setInterval(() => {
-      phraseIdx = (phraseIdx + 1) % CALC_PHRASES.length;
-      setCalcPhrase(CALC_PHRASES[phraseIdx]);
-    }, 500);
-
-    // Flip numbers
     let ticks = 0;
     intervalRef.current = setInterval(() => {
-      setDisplayPercent(Math.floor(Math.random() * 100) + 1);
+      setPercent(Math.floor(Math.random() * 100) + 1);
       ticks++;
       if (ticks >= 30) {
         if (intervalRef.current) clearInterval(intervalRef.current);
-        if (phraseIntervalRef.current) clearInterval(phraseIntervalRef.current);
-
-        setDisplayPercent(pct);
+        setPercent(final);
+        setFinalPercent(final);
         setIsRandomizing(false);
-
-        // Pop animation on number
-        scaleAnim.setValue(0.5);
-        Animated.sequence([
-          Animated.timing(scaleAnim, { toValue: 1.25, duration: 150, useNativeDriver: true }),
-          Animated.timing(scaleAnim, { toValue: 1.0, duration: 100, useNativeDriver: true }),
-        ]).start();
-
         Vibration.vibrate(50);
-
-        // Fade in result card
-        setResult({ pct, luckyNum, luckyColor, reading, status });
-        setShowResult(true);
-        Animated.timing(resultFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-
-        saveToHistory(pct, luckyNum);
+        saveToHistory(final);
+        console.log('[LoveMatch] Final result:', final);
       }
     }, 80);
   };
 
-  const handleReset = () => {
-    console.log('[LoveMatch] Reset pressed');
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (phraseIntervalRef.current) clearInterval(phraseIntervalRef.current);
-    setIsRandomizing(false);
-    setShowResult(false);
-    setDisplayPercent(null);
-    setResult(null);
-    setYourName('');
-    setCrushName('');
-    setError('');
-  };
-
   const isRunning = isRandomizing;
+  const showResult = percent !== null;
+  const crushDisplayName = crushName.trim() || 'They';
 
   return (
     <View style={{ flex: 1, backgroundColor: '#1a102e' }}>
@@ -243,7 +151,11 @@ export default function LoveMatchScreen() {
                     opacity: isRunning ? 0.5 : 1,
                   }}
                 >
-                  <Text style={{ fontSize: 12, color: isActive ? '#000000' : '#9ca3af', fontWeight: isActive ? '700' : '400' }}>
+                  <Text style={{
+                    fontSize: 12,
+                    color: isActive ? '#000000' : '#9ca3af',
+                    fontWeight: isActive ? '700' : '400',
+                  }}>
                     {gender}
                   </Text>
                 </TouchableOpacity>
@@ -271,7 +183,6 @@ export default function LoveMatchScreen() {
                 paddingHorizontal: 16,
                 color: '#ffffff',
                 fontSize: 13,
-                opacity: isRunning ? 0.5 : 1,
               }}
             />
           </Animated.View>
@@ -296,7 +207,6 @@ export default function LoveMatchScreen() {
                 paddingHorizontal: 16,
                 color: '#ffffff',
                 fontSize: 13,
-                opacity: isRunning ? 0.5 : 1,
               }}
             />
           </Animated.View>
@@ -312,122 +222,62 @@ export default function LoveMatchScreen() {
           onPress={handleCheck}
           disabled={isRunning}
           style={{
-            backgroundColor: isRunning ? '#7a6a00' : '#facc15',
+            backgroundColor: '#facc15',
             height: 50,
             borderRadius: 12,
             alignItems: 'center',
             justifyContent: 'center',
             marginTop: 8,
+            opacity: isRunning ? 0.85 : 1,
           }}
         >
-          <Text style={{ color: '#000000', fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+          <Text style={{
+            color: '#000000',
+            fontWeight: '800',
+            fontSize: 12,
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+          }}>
             {isRunning ? 'CALCULATING...' : 'CHECK COMPATIBILITY 💖'}
           </Text>
         </TouchableOpacity>
 
-        {/* Number display box — shown while randomizing OR after result */}
-        {displayPercent !== null ? (
-          <View
-            style={{
-              backgroundColor: '#2a1e4a',
-              borderRadius: 16,
-              height: 120,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 4,
-            }}
-          >
-            {isRandomizing ? (
+        {/* Result — NO box, NO background, pure floating text */}
+        {showResult && percent !== null ? (
+          <View style={{ backgroundColor: 'transparent', alignItems: 'center', marginTop: 20 }}>
+            <Text style={{
+              fontSize: 64,
+              fontWeight: '900',
+              color: '#facc15',
+              textAlign: 'center',
+            }}>
+              {percent}%
+            </Text>
+            {finalPercent !== null ? (
               <>
                 <Text style={{
-                  color: '#facc15',
-                  fontSize: 64,
-                  fontWeight: '800',
+                  color: '#ffffff',
+                  fontWeight: '700',
+                  fontSize: 14,
                   textAlign: 'center',
-                  shadowColor: '#facc15',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.9,
-                  shadowRadius: 16,
+                  marginTop: 8,
+                  lineHeight: 22,
+                  paddingHorizontal: 8,
                 }}>
-                  {displayPercent}
+                  {`Love ${finalPercent}% | Drama 100% | ${crushDisplayName} thinks about you 24/7: 100%`}
                 </Text>
-                <Text style={{ color: '#9ca3af', fontSize: 12, marginTop: 4 }}>{calcPhrase}</Text>
+                <Text style={{
+                  color: '#9ca3af',
+                  fontSize: 12,
+                  textAlign: 'center',
+                  marginTop: 6,
+                  paddingHorizontal: 8,
+                }}>
+                  {`Love ${finalPercent}% | Drama 100% | Loyalty ${loyaltyPct}%`}
+                </Text>
               </>
-            ) : (
-              <Animated.Text style={{
-                color: '#facc15',
-                fontSize: 64,
-                fontWeight: '800',
-                textAlign: 'center',
-                transform: [{ scale: scaleAnim }],
-                shadowColor: '#facc15',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.9,
-                shadowRadius: 16,
-              }}>
-                {`${displayPercent}%`}
-              </Animated.Text>
-            )}
+            ) : null}
           </View>
-        ) : null}
-
-        {/* Inline result card — fades in after animation */}
-        {showResult && result ? (
-          <Animated.View
-            style={{
-              opacity: resultFadeAnim,
-              backgroundColor: '#241a3d',
-              borderRadius: 16,
-              padding: 20,
-              gap: 8,
-            }}
-          >
-            {/* Status */}
-            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', textAlign: 'center' }}>
-              {result.pct}% Compatible
-            </Text>
-            <Text style={{ color: '#a78bfa', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
-              {result.status}
-            </Text>
-
-            {/* Reading */}
-            <Text style={{ color: '#9ca3af', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 4 }}>
-              {result.reading}
-            </Text>
-
-            {/* Lucky row */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-              <View>
-                <Text style={{ color: '#6b7280', fontSize: 10 }}>Lucky Number</Text>
-                <Text style={{ color: '#facc15', fontSize: 16, fontWeight: '700', marginTop: 2 }}>{result.luckyNum}</Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: '#6b7280', fontSize: 10 }}>Lucky Color</Text>
-                <Text style={{ color: '#facc15', fontSize: 16, fontWeight: '700', marginTop: 2 }}>{result.luckyColor}</Text>
-              </View>
-            </View>
-
-            {/* Divider */}
-            <View style={{ height: 1, backgroundColor: '#2a2342', marginVertical: 8 }} />
-
-            {/* Try Again button */}
-            <TouchableOpacity
-              onPress={handleReset}
-              style={{
-                backgroundColor: 'transparent',
-                borderWidth: 1,
-                borderColor: '#2a2342',
-                height: 44,
-                borderRadius: 12,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: '#ffffff', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                TRY AGAIN
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
         ) : null}
       </ScrollView>
     </View>
