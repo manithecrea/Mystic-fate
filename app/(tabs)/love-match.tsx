@@ -7,6 +7,7 @@ import {
   Animated,
   ScrollView,
   Vibration,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,6 +35,7 @@ export default function LoveMatchScreen() {
   const [finalPercent, setFinalPercent] = useState<number | null>(null);
   const [isRandomizing, setIsRandomizing] = useState(false);
   const [loyaltyPct] = useState(() => Math.floor(Math.random() * 40) + 30);
+  const [showShare, setShowShare] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -68,6 +70,7 @@ export default function LoveMatchScreen() {
   };
 
   const handleCheck = () => {
+    setShowShare(false);
     console.log('[LoveMatch] CHECK COMPATIBILITY pressed — yourName:', yourName, 'crushName:', crushName);
     if (!yourName.trim() || !crushName.trim()) {
       triggerShake();
@@ -90,11 +93,22 @@ export default function LoveMatchScreen() {
         setPercent(final);
         setFinalPercent(final);
         setIsRandomizing(false);
+        setShowShare(true);
         Vibration.vibrate(50);
         saveToHistory(final);
         console.log('[LoveMatch] Final result:', final);
       }
     }, 80);
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `We got ${percent}%! 💘 Love ${percent}% | Drama 100% | ${crushDisplayName} thinks about you 24/7: 100%`,
+      });
+    } catch (e) {
+      console.log('[LoveMatch] Share failed:', e);
+    }
   };
 
   const isRunning = isRandomizing;
@@ -275,6 +289,23 @@ export default function LoveMatchScreen() {
                 }}>
                   {`Love ${finalPercent}% | Drama 100% | Loyalty ${loyaltyPct}%`}
                 </Text>
+                {showShare && !isRandomizing && finalPercent !== null && (
+                  <TouchableOpacity
+                    onPress={handleShare}
+                    style={{
+                      backgroundColor: '#facc15',
+                      paddingVertical: 12,
+                      paddingHorizontal: 28,
+                      borderRadius: 24,
+                      alignSelf: 'center',
+                      marginTop: 20,
+                    }}
+                  >
+                    <Text style={{ color: '#000000', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>
+                      SHARE MATCH 💘
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </>
             ) : null}
           </View>
