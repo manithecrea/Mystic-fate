@@ -1,8 +1,11 @@
 {
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-9415637801845502~6749402790"
+  },
   "expo": {
     "name": "Mystic Fate",
-    "slug": "mystic-fate",
-    "version": "1.0.0",
+    "slug": "mystic-fate-app-sprnfr",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-moj.png",
     "userInterfaceStyle": "automatic",
@@ -23,8 +26,8 @@
         "foregroundImage": "./assets/images/app-icon-moj.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.lovematch.fortune",
-      "versionCode": 1,
+      "package": "com.lovematchfortune.app",
+      "versionCode": 2,
       "googleMobileAdsAppId": "ca-app-pub-9415637801845502~6749402790"
     },
     "web": {
