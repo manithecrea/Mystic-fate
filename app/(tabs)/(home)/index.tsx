@@ -10,6 +10,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const HISTORY_KEY = 'fortune_history';
+
+interface HistoryItem {
+  id: string;
+  fortune: string;
+  category: string;
+  timestamp: number;
+  luckyNumber: number;
+}
 
 const FORTUNES: Record<string, string[]> = {
   'Love': [
@@ -137,12 +148,31 @@ export default function HomeScreen() {
     setSelectedCategory(category);
   }, []);
 
-  const handleReveal = useCallback(() => {
+  const handleReveal = useCallback(async () => {
     console.log('[HomeScreen] Reveal My Fate pressed, category:', selectedCategory);
     const fortunes = FORTUNES[selectedCategory] ?? FORTUNES['Love'];
     const randomIndex = Math.floor(Math.random() * fortunes.length);
     const fortune = fortunes[randomIndex];
     console.log('[HomeScreen] Fortune selected:', fortune);
+
+    const newItem: HistoryItem = {
+      id: Date.now().toString(),
+      fortune: fortune,
+      category: selectedCategory,
+      timestamp: Date.now(),
+      luckyNumber: Math.floor(Math.random() * 99) + 1,
+    };
+    console.log('[HomeScreen] Saving fortune to history, id:', newItem.id, 'luckyNumber:', newItem.luckyNumber);
+    try {
+      const raw = await AsyncStorage.getItem(HISTORY_KEY);
+      const existing: HistoryItem[] = raw ? JSON.parse(raw) : [];
+      const updated = [newItem, ...existing];
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+      console.log('[HomeScreen] History saved, total items:', updated.length);
+    } catch (e) {
+      console.log('[HomeScreen] Error saving history:', e);
+    }
+
     setCurrentFortune(fortune);
     setModalVisible(true);
     if (Platform.OS === 'ios') {
