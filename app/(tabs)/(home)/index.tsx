@@ -1,12 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  Modal,
-  Pressable,
+  Animated,
   Platform,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -46,7 +46,7 @@ const FORTUNES: Record<string, string[]> = {
     "Cherish the small moments — they are the foundation of forever.",
   ],
   'Money': [
-    "A financial opportunity is approaching — stay alert and ready.",
+    "A bag is coming. Not Birkin. Bills.",
     "The seeds you planted are about to bear fruit. Harvest time is near.",
     "An unexpected source of income will surprise you this month.",
     "Your hard work has not gone unnoticed. Reward is coming.",
@@ -135,57 +135,146 @@ const FORTUNES: Record<string, string[]> = {
   ],
 };
 
+const LUCKY_COLORS = ['Gold', 'Silver', 'Violet', 'Crimson', 'Emerald', 'Sapphire', 'Rose', 'Amber'];
+
+const LOADING_TEXTS = [
+  "The spirits are checking the receipts.",
+  "Shuffling the fate...",
+  "Consulting the stars...",
+  "The ancestors are whispering...",
+  "Reading your aura...",
+  "Asking the cards...",
+];
+
 const CATEGORIES = ['Love', 'Money', 'Future', 'Yes / No', 'Ex'];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState('Love');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [currentFortune, setCurrentFortune] = useState('');
 
-  const handleCategoryPress = useCallback((category: string) => {
-    console.log('[HomeScreen] Category selected:', category);
-    setSelectedCategory(category);
-  }, []);
+  // Reveal flow state
+  const [isRevealing, setIsRevealing] = useState(false);
+  const [showFortune, setShowFortune] = useState(false);
+  const [loadingText, setLoadingText] = useState(LOADING_TEXTS[0]);
+  const [currentFortune, setCurrentFortune] = useState('');
+  const [currentCategory, setCurrentCategory] = useState('');
+  const [luckyNumber, setLuckyNumber] = useState(0);
+  const [luckyColor, setLuckyColor] = useState('Gold');
+
+  // Animations
+  const bounceAnim = useRef(new Animated.Value(1)).current;
+  const cardSlideAnim = useRef(new Animated.Value(60)).current;
+  const cardOpacityAnim = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  const startBounce = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, { toValue: 1.15, duration: 400, useNativeDriver: true }),
+        Animated.timing(bounceAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ])
+    ).start();
+  };
+
+  const stopBounce = () => {
+    bounceAnim.stopAnimation();
+    bounceAnim.setValue(1);
+  };
 
   const handleReveal = useCallback(async () => {
     console.log('[HomeScreen] Reveal My Fate pressed, category:', selectedCategory);
+
     const fortunes = FORTUNES[selectedCategory] ?? FORTUNES['Love'];
     const randomIndex = Math.floor(Math.random() * fortunes.length);
     const fortune = fortunes[randomIndex];
+    const lNum = Math.floor(Math.random() * 99) + 1;
+    const lColor = LUCKY_COLORS[Math.floor(Math.random() * LUCKY_COLORS.length)];
+
     console.log('[HomeScreen] Fortune selected:', fortune);
 
+    // Save to history
     const newItem: HistoryItem = {
       id: Date.now().toString(),
-      fortune: fortune,
+      fortune,
       category: selectedCategory,
       timestamp: Date.now(),
-      luckyNumber: Math.floor(Math.random() * 99) + 1,
+      luckyNumber: lNum,
     };
-    console.log('[HomeScreen] Saving fortune to history, id:', newItem.id, 'luckyNumber:', newItem.luckyNumber);
     try {
       const raw = await AsyncStorage.getItem(HISTORY_KEY);
       const existing: HistoryItem[] = raw ? JSON.parse(raw) : [];
-      const updated = [newItem, ...existing];
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-      console.log('[HomeScreen] History saved, total items:', updated.length);
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify([newItem, ...existing]));
+      console.log('[HomeScreen] History saved, total items:', existing.length + 1);
     } catch (e) {
       console.log('[HomeScreen] Error saving history:', e);
     }
 
     setCurrentFortune(fortune);
-    setModalVisible(true);
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
+    setCurrentCategory(selectedCategory);
+    setLuckyNumber(lNum);
+    setLuckyColor(lColor);
+    setShowFortune(false);
+    setIsRevealing(true);
+    setLoadingText(LOADING_TEXTS[0]);
+
+    // Fade in overlay
+    Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+
+    // Start sparkle bounce
+    startBounce();
+
+    // Cycle loading texts
+    let i = 1;
+    const textInterval = setInterval(() => {
+      setLoadingText(LOADING_TEXTS[i % LOADING_TEXTS.length]);
+      i++;
+    }, 600);
+
+    // After 2.5s show result
+    setTimeout(() => {
+      clearInterval(textInterval);
+      stopBounce();
+      setIsRevealing(false);
+      setShowFortune(true);
+
+      if (Platform.OS === 'ios') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+
+      // Slide card up
+      cardSlideAnim.setValue(60);
+      cardOpacityAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(cardSlideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(cardOpacityAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]).start();
+    }, 2500);
   }, [selectedCategory]);
 
-  const handleCloseModal = useCallback(() => {
-    console.log('[HomeScreen] Fortune modal closed');
-    setModalVisible(false);
+  const handleClose = useCallback(() => {
+    console.log('[HomeScreen] Fortune closed');
+    Animated.timing(overlayOpacity, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
+      setIsRevealing(false);
+      setShowFortune(false);
+    });
   }, []);
 
-  const categoryBadgeText = selectedCategory.toUpperCase();
+  const handleShare = useCallback(async () => {
+    console.log('[HomeScreen] Share Fortune pressed');
+    try {
+      await Share.share({ message: `🔮 My fortune: "${currentFortune}" — Lucky ${luckyNumber} | ${luckyColor}` });
+    } catch (e) {
+      console.log('[HomeScreen] Share failed:', e);
+    }
+  }, [currentFortune, luckyNumber, luckyColor]);
+
+  const handleShakeAgain = useCallback(() => {
+    console.log('[HomeScreen] Shake Again pressed');
+    handleClose();
+    setTimeout(() => handleReveal(), 300);
+  }, [handleReveal, handleClose]);
+
+  const categoryBadgeText = currentCategory.toUpperCase();
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
@@ -199,96 +288,44 @@ export default function HomeScreen() {
           style={{
             backgroundColor: '#1a102e',
             borderRadius: 24,
-            borderCurve: 'continuous',
             marginHorizontal: 16,
             padding: 20,
           }}
         >
           {/* Top bar */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text
-              style={{
-                fontSize: 10,
-                fontWeight: '800',
-                color: '#facc15',
-                letterSpacing: 2,
-                textTransform: 'uppercase',
-              }}
-            >
+            <Text style={{ fontSize: 10, fontWeight: '800', color: '#facc15', letterSpacing: 2, textTransform: 'uppercase' }}>
               FORTUNE TELLER
             </Text>
-            <Text style={{ fontSize: 12, color: '#ffffff' }}>
-              🔥 1 days streak
-            </Text>
+            <Text style={{ fontSize: 12, color: '#ffffff' }}>🔥 1 days streak</Text>
           </View>
 
           {/* Headline */}
-          <Text
-            style={{
-              fontSize: 28,
-              fontWeight: '800',
-              color: '#ffffff',
-              lineHeight: 34,
-              marginTop: 20,
-            }}
-          >
+          <Text style={{ fontSize: 28, fontWeight: '800', color: '#ffffff', lineHeight: 34, marginTop: 20 }}>
             {'What is the universe\nnot telling you?'}
           </Text>
 
           {/* Subtext */}
-          <Text
-            style={{
-              fontSize: 14,
-              color: '#9ca3af',
-              lineHeight: 20,
-              marginTop: 8,
-            }}
-          >
+          <Text style={{ fontSize: 14, color: '#9ca3af', lineHeight: 20, marginTop: 8 }}>
             {'Ask your question in your mind.\nThe cards already know.'}
           </Text>
 
-          {/* Center circle */}
+          {/* Center orb */}
           <View
             style={{
-              width: 160,
-              height: 160,
-              borderRadius: 80,
+              width: 160, height: 160, borderRadius: 80,
               backgroundColor: '#a855f7',
               alignSelf: 'center',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 24,
-              marginBottom: 24,
+              alignItems: 'center', justifyContent: 'center',
+              marginTop: 24, marginBottom: 24,
               shadowColor: '#a855f7',
               shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.6,
-              shadowRadius: 40,
-              elevation: 20,
+              shadowOpacity: 0.6, shadowRadius: 40, elevation: 20,
             }}
           >
-            <Text
-              style={{
-                position: 'absolute',
-                top: 30,
-                right: 40,
-                fontSize: 20,
-                color: '#fde047',
-              }}
-            >
-              ✦
-            </Text>
+            <Text style={{ position: 'absolute', top: 30, right: 40, fontSize: 20, color: '#fde047' }}>✦</Text>
             <Text style={{ fontSize: 36, color: '#fde047' }}>✦</Text>
-            <Text
-              style={{
-                position: 'absolute',
-                bottom: 30,
-                left: 40,
-                fontSize: 16,
-                color: '#fde047',
-              }}
-            >
-              ✦
-            </Text>
+            <Text style={{ position: 'absolute', bottom: 30, left: 40, fontSize: 16, color: '#fde047' }}>✦</Text>
           </View>
 
           {/* Category pills */}
@@ -303,25 +340,20 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={category}
-                  onPress={() => handleCategoryPress(category)}
+                  onPress={() => {
+                    console.log('[HomeScreen] Category selected:', category);
+                    setSelectedCategory(category);
+                  }}
                   style={{
                     borderWidth: 1,
                     borderColor: isSelected ? '#facc15' : '#2a2342',
                     borderRadius: 12,
-                    borderCurve: 'continuous',
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
+                    paddingHorizontal: 16, paddingVertical: 10,
                     marginRight: 8,
-                    backgroundColor: isSelected ? 'rgba(250, 204, 21, 0.1)' : 'transparent',
+                    backgroundColor: isSelected ? 'rgba(250,204,21,0.1)' : 'transparent',
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: isSelected ? '#facc15' : '#ffffff',
-                      fontWeight: isSelected ? '600' : '400',
-                    }}
-                  >
+                  <Text style={{ fontSize: 13, color: isSelected ? '#facc15' : '#ffffff', fontWeight: isSelected ? '600' : '400' }}>
                     {category}
                   </Text>
                 </TouchableOpacity>
@@ -329,35 +361,25 @@ export default function HomeScreen() {
             })}
           </ScrollView>
 
-          {/* Pills hint */}
           <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
             Pick a lane. The cards already know.
           </Text>
 
-          {/* CTA Button */}
+          {/* CTA */}
           <TouchableOpacity
             onPress={handleReveal}
+            disabled={isRevealing}
             style={{
               backgroundColor: '#facc15',
               borderRadius: 12,
-              borderCurve: 'continuous',
               height: 52,
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              marginTop: 16,
+              alignItems: 'center', justifyContent: 'center',
+              width: '100%', marginTop: 16,
+              opacity: isRevealing ? 0.7 : 1,
             }}
           >
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: '800',
-                color: '#000000',
-                letterSpacing: 1.5,
-                textTransform: 'uppercase',
-              }}
-            >
-              REVEAL MY FATE
+            <Text style={{ fontSize: 14, fontWeight: '800', color: '#000000', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+              {isRevealing ? 'READING YOUR FATE...' : 'REVEAL MY FATE'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -367,7 +389,6 @@ export default function HomeScreen() {
           style={{
             backgroundColor: '#1a102e',
             borderRadius: 24,
-            borderCurve: 'continuous',
             padding: 20,
             marginHorizontal: 16,
             marginTop: 16,
@@ -375,137 +396,157 @@ export default function HomeScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ fontSize: 24 }}>💘</Text>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '700',
-                color: '#ffffff',
-                marginLeft: 8,
-              }}
-            >
-              Love Match
-            </Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#ffffff', marginLeft: 8 }}>Love Match</Text>
           </View>
-          <Text style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>
-            Discover your cosmic compatibility
-          </Text>
+          <Text style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>Discover your cosmic compatibility</Text>
         </View>
       </ScrollView>
 
-      {/* Fortune Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={handleCloseModal}
-      >
-        <Pressable
+      {/* Full-screen overlay for loading + result */}
+      {(isRevealing || showFortune) && (
+        <Animated.View
           style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.85)',
-            justifyContent: 'flex-end',
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: '#1a102e',
+            opacity: overlayOpacity,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 24,
+            paddingBottom: insets.bottom + 80,
           }}
-          onPress={handleCloseModal}
         >
-          <Pressable
-            onPress={() => {}}
-            style={{
-              backgroundColor: '#1a102e',
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              borderCurve: 'continuous',
-              padding: 28,
-              paddingBottom: 40 + insets.bottom,
-            }}
-          >
-            {/* Drag handle */}
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: '#2a2342',
-                borderRadius: 2,
-                alignSelf: 'center',
-                marginBottom: 20,
-              }}
-            />
-
-            {/* Category badge */}
-            <View
-              style={{
-                backgroundColor: 'rgba(168,85,247,0.2)',
-                borderRadius: 8,
-                borderCurve: 'continuous',
-                paddingHorizontal: 12,
-                paddingVertical: 4,
-                alignSelf: 'flex-start',
-                marginBottom: 16,
-              }}
-            >
-              <Text
+          {/* STEP 1: Loading */}
+          {isRevealing && (
+            <View style={{ alignItems: 'center' }}>
+              <Animated.Text
                 style={{
-                  fontSize: 11,
-                  color: '#a855f7',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: 1,
+                  fontSize: 48,
+                  transform: [{ scale: bounceAnim }],
+                  marginBottom: 28,
                 }}
               >
-                {categoryBadgeText}
+                ✨
+              </Animated.Text>
+              <Text
+                style={{
+                  color: '#ffffff',
+                  fontSize: 18,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  lineHeight: 26,
+                  paddingHorizontal: 16,
+                }}
+              >
+                {loadingText}
               </Text>
             </View>
+          )}
 
-            {/* Fortune text */}
-            <Text
+          {/* STEP 2: Fortune result */}
+          {showFortune && (
+            <Animated.View
               style={{
-                fontSize: 20,
-                fontWeight: '700',
-                color: '#ffffff',
-                lineHeight: 30,
+                width: '100%',
+                opacity: cardOpacityAnim,
+                transform: [{ translateY: cardSlideAnim }],
               }}
             >
-              {currentFortune}
-            </Text>
-
-            {/* Subtext */}
-            <Text
-              style={{
-                fontSize: 12,
-                color: '#6b7280',
-                textAlign: 'center',
-                marginTop: 20,
-              }}
-            >
-              ✦ The cards have spoken ✦
-            </Text>
-
-            {/* Close button */}
-            <TouchableOpacity
-              onPress={handleCloseModal}
-              style={{
-                marginTop: 24,
-                backgroundColor: '#facc15',
-                borderRadius: 12,
-                borderCurve: 'continuous',
-                height: 48,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text
+              {/* Fortune card */}
+              <View
                 style={{
-                  fontSize: 13,
-                  fontWeight: '800',
-                  color: '#000',
-                  letterSpacing: 1.5,
+                  backgroundColor: '#2a1a4a',
+                  borderRadius: 16,
+                  padding: 20,
+                  marginBottom: 16,
                 }}
               >
-                CLOSE
+                {/* Category label */}
+                <Text
+                  style={{
+                    color: '#a78bfa',
+                    fontSize: 10,
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: 1.5,
+                    marginBottom: 12,
+                  }}
+                >
+                  {categoryBadgeText}
+                </Text>
+
+                {/* Fortune text */}
+                <Text
+                  style={{
+                    color: '#ffffff',
+                    fontSize: 20,
+                    fontWeight: '700',
+                    lineHeight: 28,
+                    marginBottom: 16,
+                  }}
+                >
+                  {currentFortune}
+                </Text>
+
+                {/* Lucky row */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: '#facc15', fontSize: 12, fontWeight: '700' }}>
+                    Lucky {luckyNumber}
+                  </Text>
+                  <Text style={{ color: '#facc15', fontSize: 12, fontWeight: '700' }}>
+                    {luckyColor}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Countdown hint */}
+              <Text style={{ color: '#6b7280', fontSize: 11, textAlign: 'center', marginBottom: 20 }}>
+                ✦ The cards have spoken ✦
               </Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
+
+              {/* Share button */}
+              <TouchableOpacity
+                onPress={handleShare}
+                style={{
+                  backgroundColor: '#facc15',
+                  borderRadius: 12,
+                  height: 48,
+                  alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ color: '#000000', fontWeight: '800', fontSize: 13, letterSpacing: 1 }}>
+                  SHARE FORTUNE
+                </Text>
+              </TouchableOpacity>
+
+              {/* Shake Again */}
+              <TouchableOpacity
+                onPress={handleShakeAgain}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#4a3a6a',
+                  borderRadius: 12,
+                  height: 48,
+                  alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
+                  SHAKE AGAIN
+                </Text>
+              </TouchableOpacity>
+
+              {/* Close X */}
+              <TouchableOpacity
+                onPress={handleClose}
+                style={{ alignItems: 'center', marginTop: 4, paddingVertical: 8 }}
+              >
+                <Text style={{ color: '#6b7280', fontSize: 13 }}>✕ Close</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </Animated.View>
+      )}
     </View>
   );
 }
