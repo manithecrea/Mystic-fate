@@ -390,6 +390,33 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const handleRestorePurchases = useCallback(async () => {
+    console.log('[HomeScreen] Restore Purchases pressed');
+    try {
+      await InAppPurchases.connectAsync();
+      const { responseCode, results } = await InAppPurchases.getPurchaseHistoryAsync();
+      if (responseCode === InAppPurchases.IAPResponseCode.OK && results?.length) {
+        const hasPremium = results.some(p => p.productId === IAP_PRODUCT_ID);
+        if (hasPremium) {
+          await AsyncStorage.setItem(PREMIUM_KEY, 'true');
+          setIsPremium(true);
+          setShowOutOfReveals(false);
+          console.log('[HomeScreen] Restore successful — premium re-activated');
+          Alert.alert('✨ Restored!', 'Your premium access has been restored.');
+        } else {
+          Alert.alert('Nothing to Restore', 'No previous premium purchase was found for this account.');
+        }
+      } else {
+        Alert.alert('Nothing to Restore', 'No previous purchases found. If you believe this is an error, contact support.');
+      }
+    } catch (e) {
+      console.log('[HomeScreen] Restore exception:', e);
+      Alert.alert('Restore Failed', 'Could not restore purchases. Please try again later.');
+    } finally {
+      try { await InAppPurchases.disconnectAsync(); } catch (_) {}
+    }
+  }, []);
+
   const categoryBadgeText = currentCategory.toUpperCase();
   const isOutOfReveals = !isPremium && revealsLeft <= 0;
 
@@ -591,6 +618,13 @@ export default function HomeScreen() {
 
           <TouchableOpacity onPress={() => setShowOutOfReveals(false)} style={{ paddingVertical: 8 }}>
             <Text style={{ color: '#6b7280', fontSize: 13 }}>✕ Close</Text>
+          </TouchableOpacity>
+
+          {/* Restore Purchases — required by Apple Guideline 3.1.1 */}
+          <TouchableOpacity onPress={handleRestorePurchases} style={{ paddingVertical: 8, marginTop: 4 }}>
+            <Text style={{ color: '#6b7280', fontSize: 12, textDecorationLine: 'underline', textAlign: 'center' }}>
+              Restore Purchases
+            </Text>
           </TouchableOpacity>
         </View>
       )}
