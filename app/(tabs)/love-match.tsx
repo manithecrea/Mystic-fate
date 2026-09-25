@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const GENDERS = ['Boy 💙', 'Girl 💖', 'Non-binary ✨'];
+const GENDERS = ['Boy 💙', 'Girl 💖'];
 
 function calcCompatibility(a: string, b: string): number {
   const combined = (a + b).toLowerCase();
