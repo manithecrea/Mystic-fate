@@ -23,14 +23,7 @@
       "expo-font",
       "expo-router",
       "expo-web-browser",
-      "expo-secure-store",
-      [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-8915657807465502~4246402790",
-          "iosAppId": "ca-app-pub-3940255099942544~1458002511"
-        }
-      ]
+      "expo-secure-store"
     ],
     "scheme": "mysticfate",
     "experiments": {
@@ -38,7 +31,6 @@
     },
     "extra": {
       "router": {}
-    },
-    "icon": "./assets/icon.png"
+    }
   }
 }
