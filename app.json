@@ -1,11 +1,8 @@
 {
-  "react-native-google-mobile-ads": {
-    "android_app_id": "ca-app-pub-9415637801845502~6749402790"
-  },
   "expo": {
     "name": "Mystic Fate",
     "slug": "mystic-fate-app-sprnfr",
-    "version": "1.0.1",
+    "version": "1.0.1", 
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-moj.png",
     "userInterfaceStyle": "automatic",
@@ -18,7 +15,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.lovematch.fortune",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppDoesNotUseNonExemptEncryption": false
       }
     },
     "android": {
@@ -28,7 +25,7 @@
       },
       "package": "com.lovematch.fortune",
       "versionCode": 2,
-      "googleMobileAdsAppId": "ca-app-pub-9415637801845502~6749402790"
+      "googleMobileAdsAppId": "ca-app-pub-9415637801845502-6749402790"
     },
     "web": {
       "favicon": "./assets/images/newly.png",
@@ -42,7 +39,8 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-9415637801845502~6749402790"
+          "androidAppId": "ca-app-pub-9415637801845502-6749402790",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
       ]
     ],
