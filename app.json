@@ -4,7 +4,6 @@
     "slug": "mystic-fate",
     "version": "1.0.0",
     "scheme": "mysticfate",
-    "orientation": "portrait",
     "platforms": ["android"],
     "android": {
       "package": "com.mysticfate.app",
