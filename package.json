@@ -4,7 +4,6 @@
   "main": "index.ts",
   "packageManager": "npm@10.8.2",
   "scripts": {
-    "preinstall": "rm -f bun.lock bun.lockb bunfig.toml K M",
     "dev": "EXPO_NO_TELEMETRY=1 expo start",
     "android": "EXPO_NO_TELEMETRY=1 expo start --android",
     "ios": "EXPO_NO_TELEMETRY=1 expo start --ios",
