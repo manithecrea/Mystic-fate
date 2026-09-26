@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Mystic Fats",
-    "slug": "mystic-fate-app-sprnfr",
+    "name": "Mystic Fate",
+    "slug": "mystic-fate",
     "version": "1.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
