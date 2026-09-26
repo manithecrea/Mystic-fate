@@ -1,31 +1,31 @@
 {
   "expo": {
-    "name": "Mystic Fate",
-    "slug": "mystic-fate",
+    "name": "Mystic Fats",
+    "slug": "mystic-fate-app-sprnfr",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/app-icon-moj.png",
+    "icon": "./assets/images/app-icon-noj.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/app-icon-moj.png",
+      "image": "./assets/images/app-icon-noj.png",
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lovematch.fortune",
+      "bundleIdentifier": "com.lovewatch.fortune",
       "infoPlist": {
-        "ITSAppDoesNotUseNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/app-icon-moj.png",
+        "foregroundImage": "./assets/images/app-icon-noj.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.lovematch.fortune",
+      "package": "com.lovewatch.fortune",
       "versionCode": 2,
-      "googleMobileAdsAppId": "ca-app-pub-9415637801845502-6749402790"
+      "googleMobileAdsAppId": "ca-app-pub-8915657807465502~4246402790"
     },
     "web": {
       "favicon": "./assets/images/newly.png",
@@ -39,8 +39,8 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-9415637801845502-6749402790",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          "androidAppId": "ca-app-pub-8915657807465502~4246402790",
+          "iosAppId": "ca-app-pub-3940255099942544~1458002511"
         }
       ]
     ],
