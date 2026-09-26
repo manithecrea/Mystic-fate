@@ -1,1 +1,0 @@
-rm -f bun.lock bun.lockb bunfig.toml K M
