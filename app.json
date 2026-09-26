@@ -1,32 +1,15 @@
 {
   "expo": {
     "name": "Mystic Fate",
-    "slug": "mystic-fate-app-sprnfr",
-    "version": "1.0.1",
-    "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.lovewatch.fortune",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
-    "android": {
-      "package": "com.lovewatch.fortune",
-      "versionCode": 2
-    },
-    "web": {
-      "bundler": "metro"
-    },
-    "plugins": []
+    "slug": "mystic-fate",
+    "version": "1.0.0",
     "scheme": "mysticfate",
-    "experiments": {
-      "typedRoutes": true
+    "orientation": "portrait",
+    "platforms": ["android"],
+    "android": {
+      "package": "com.mysticfate.app",
+      "versionCode": 1
     },
-    "extra": {
-      "router": {}
-    },
-    "icon": "./assets/icon.png"
+    "plugins": ["expo-router"]
   }
 }
