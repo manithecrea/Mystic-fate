@@ -1,5 +1,3 @@
-Replace the entire package.json file with this clean working version. Delete everything inside package.json first, then paste this exactly:
-
 {
   "name": "Mystic Fate",
   "version": "1.0.0",
@@ -32,5 +30,3 @@ Replace the entire package.json file with this clean working version. Delete eve
   },
   "private": true
 }
-
-After replacing, delete the file bun.lock completely from the file explorer. Then save all files and build the Android APK. Do not add react-native-google-mobile-ads or leaflet or workbox.
