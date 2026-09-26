@@ -88,7 +88,3 @@
     "@expo/prebuild-config": "latest"
   },
   "private": true,
-  "patchedDependencies": {
-    "react-native-google-mobile-ads@17.2.0": "patches/react-native-google-mobile-ads@17.2.0.patch"
-  }
-}
