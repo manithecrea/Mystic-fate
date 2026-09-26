@@ -12,10 +12,15 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - run: npm install
+      - run: npm install --legacy-peer-deps
       - run: npx expo prebuild --platform android --no-install --clean
-      - run: cd android &&./gradlew bundleRelease
+      - run: chmod +x android/gradlew
+      - run: cd android &&./gradlew bundleRelease assembleRelease
       - uses: actions/upload-artifact@v4
         with:
           name: app-aab
           path: android/app/build/outputs/bundle/release/*.aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-apk
+          path: android/app/build/outputs/apk/release/*.apk
