@@ -1,30 +1,30 @@
+Replace the entire package.json file with this clean working version. Delete everything inside package.json first, then paste this exactly:
+
 {
-  "name": "mystic-fate-app-sprnfr",
-  "slug": "mystic-fate-app-upr1ft",
+  "name": "Mystic Fate",
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "start": "EXPO_NO_TELEMETRY=1 expo start",
-    "android": "EXPO_NO_TELEMETRY=1 expo start --android",
-    "build:android": "EXPO_NO_TELEMETRY=1 expo prebuild -p android"
+    "start": "expo start"
   },
   "dependencies": {
-    "expo": "~53.0.9",
-    "expo-constants": "~17.0.3",
-    "expo-font": "~13.3.1",
-    "expo-haptics": "~14.1.4",
-    "expo-linking": "~7.0.4",
-    "expo-router": "~5.0.7",
-    "expo-secure-store": "~14.2.3",
-    "expo-web-browser": "~14.0.2",
-    "expo-status-bar": "~2.2.3",
+    "expo": "53.0.12",
+    "expo-modules-core": "2.3.13",
+    "expo-constants": "17.0.8",
+    "expo-font": "13.3.1",
+    "expo-haptics": "14.1.4",
+    "expo-linking": "7.0.5",
+    "expo-router": "5.0.7",
+    "expo-secure-store": "14.2.3",
+    "expo-web-browser": "14.0.2",
+    "expo-status-bar": "2.2.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
     "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "~4.11.1",
-    "react-native-gesture-handler": "~2.24.0",
-    "react-native-reanimated": "~3.17.4"
+    "react-native-screens": "4.11.1",
+    "react-native-gesture-handler": "2.24.0",
+    "react-native-reanimated": "3.17.4"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
@@ -32,3 +32,5 @@
   },
   "private": true
 }
+
+After replacing, delete the file bun.lock completely from the file explorer. Then save all files and build the Android APK. Do not add react-native-google-mobile-ads or leaflet or workbox.
