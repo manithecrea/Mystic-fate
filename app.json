@@ -38,6 +38,7 @@
     },
     "extra": {
       "router": {}
-    }
+    },
+    "icon": "./assets/icon.png"
   }
 }
